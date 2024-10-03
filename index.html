@@ -1,4 +1,52 @@
-async function getAudioDevices() {
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <title>Video Recorder with Audio Input Selection</title>
+</head>
+<body>
+    <button id="start">Start Recording</button>
+    <button id="stop" disabled>Stop Recording</button>
+    <div>
+        Select Audio Input:
+        <select id="audioInputSelect"></select>
+    </div>
+    Recording type: 
+    <select id="type">
+        <option value="video/webm">WebM</option>
+        <option value="video/ogg">OGG</option>
+    </select>
+    Resolution: 
+    <select id="res">
+        <option value="192x144">144p</option>
+        <option value="426x240">240p</option>
+        <option value="480x360">360p</option>
+        <option value="640x480">480p</option>
+        <option value="1280x720">720p</option>
+        <option value="1920x1080">1080p</option>
+        <option value="2560x1440">1440p</option>
+        <option value="3840x2160">4K</option>
+    </select>
+    <button id="download" disabled>Download</button>
+    <span id="size">Size: 0 bytes</span>
+    <video id="preview" controls autoplay muted></video>
+
+    <script>
+        const startButton = document.getElementById('start');
+        const stopButton = document.getElementById('stop');
+        const downloadButton = document.getElementById('download');
+        const audioInputSelect = document.getElementById('audioInputSelect');
+        const typeSelect = document.getElementById('type');
+        const preview = document.getElementById('preview');
+        const sizeSpan = document.getElementById('size');
+        const res = document.getElementById('res');
+        let mediaRecorder;
+        let recordedChunks = [];
+        let blob;
+        let url;
+        let stream;
+        let screenStream;
+        let micStream;
+        async function getAudioDevices() {
     try {
         // Request permission to access audio, which is necessary to get device labels
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -63,3 +111,54 @@ async function startRec() {
     startButton.disabled = true;
     stopButton.disabled = false;
 }
+
+
+        // Stop recording function
+        async function stopRec() {
+            mediaRecorder.stop();
+            preview.control = true;
+            preview.muted = false;
+            preview.autoplay = false;
+            screenStream.getTracks().forEach(track => track.stop());
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+            }
+            mediaRecorder.onstop = async () => {
+                blob = new Blob(recordedChunks, { type: typeSelect.value });
+                url = URL.createObjectURL(blob);
+                preview.srcObject = null;
+                preview.src = url;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                downloadButton.disabled = false;
+                sizeSpan.textContent = `Size: ${formatBytes(blob.size)}`;
+            };
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        startButton.addEventListener('click', startRec);
+        stopButton.addEventListener('click', stopRec);
+        downloadButton.addEventListener('click', () => {
+            let a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `recording.${typeSelect.value.split('/')[1]}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // Get audio devices on page load
+        getAudioDevices();
+        navigator.mediaDevices.ondevicechange = getAudioDevices; // Update when devices change
+    </script>
+</body>
+</html>
