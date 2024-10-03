@@ -1,0 +1,65 @@
+async function getAudioDevices() {
+    try {
+        // Request permission to access audio, which is necessary to get device labels
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Get the list of all devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        audioInputSelect.innerHTML = ''; // Clear the previous options
+
+        devices.forEach((device) => {
+            if (device.kind === 'audioinput') {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Audio Input ${audioInputSelect.length + 1}`;
+                audioInputSelect.appendChild(option);
+            }
+        });
+    } catch (err) {
+        console.error('Error accessing audio devices:', err);
+    }
+}
+
+async function startRec() {
+    recordedChunks = [];
+    preview.control = false;
+    preview.muted = true;
+    preview.autoplay = true;
+
+    let [width, height] = res.value.split('x').map(Number);
+    let frameRate = 60;
+    let videoBitrate = Math.min(width * height * frameRate, 20000000);
+
+    let audioConstraints = audioInputSelect.value
+        ? { deviceId: { exact: audioInputSelect.value }, noiseSuppression: true }
+        : true;
+
+    micStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints
+    });
+
+    screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: frameRate } },
+        audio: false
+    });
+
+    let tracks = [...screenStream.getTracks(), ...micStream.getAudioTracks()];
+    stream = new MediaStream(tracks);
+    preview.srcObject = stream;
+
+    mediaRecorder = new MediaRecorder(stream, {
+        mimeType: typeSelect.value,
+        videoBitsPerSecond: videoBitrate,
+    });
+
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+            sizeSpan.textContent = `Size: ${formatBytes(recordedChunks.reduce((total, chunk) => total + chunk.size, 0))}`;
+        }
+    };
+
+    mediaRecorder.start();
+    startButton.disabled = true;
+    stopButton.disabled = false;
+}
