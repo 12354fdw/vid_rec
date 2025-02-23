@@ -88,7 +88,7 @@ async function startRec() {
 
     screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: frameRate } },
-        audio: false
+        audio: true
     });
 
     let tracks = [...screenStream.getTracks(), ...micStream.getAudioTracks()];
